@@ -9,6 +9,7 @@
 .managed-body { white-space: pre-wrap; overflow-wrap: anywhere; }
 .managed-block .club-button { justify-self: start; }
 .announcement-cover { width: 100%; max-height: 230px; object-fit: cover; border-radius: 9px; margin-bottom: 14px; }
+/* test commit */
 :root {
   color-scheme: dark;
   --club-bg: #03051a;

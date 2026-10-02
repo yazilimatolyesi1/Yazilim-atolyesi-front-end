@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RateLimiter } from "../../rateLimiter";
 export const GET = async (request: NextRequest) => {
   const userId = request.nextUrl.pathname.split('/').pop();
   try {
+    const rateLimiter = RateLimiter(request);
+    if (!rateLimiter.allowed) {
+      return NextResponse.json({
+        error: rateLimiter.message,
+        retryAfter: rateLimiter.retryAfter
+      },
+        { status: rateLimiter.status });
+    }
     return NextResponse.json({
-      message: `Hello from the admin member ${userId} route!`,
+      userId,
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({

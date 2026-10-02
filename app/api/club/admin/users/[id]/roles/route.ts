@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-export const PATCH = async (request: NextRequest) => {
-  const userId = request.nextUrl.pathname.split('/').pop();
+import { Role } from "../../../../../../../lib/admin-types";
+import { RateLimiter } from "../../../rateLimiter";
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await request.json();
+  const { role } = body as { role: Role };
   try {
-    const requestBody = await request.json();
-    const { role } = requestBody;
-    if (!role) {
-      return NextResponse.json({ message: "Role is required in the request body." }, { status: 400 });
+    const rateLimiter = RateLimiter(request);
+    if (!rateLimiter.allowed) {
+      return NextResponse.json({
+        error: rateLimiter.message,
+        retryAfter: rateLimiter.retryAfter
+      },
+        { status: rateLimiter.status });
     }
-    return NextResponse.json({ message: `User with ID ${userId} has been assigned the role: ${role}` }, { status: 200 });
+    if (!["ADMIN", "EDITOR", "MEMBER"].includes(role)) {
+      return NextResponse.json({
+        message: "Invalid role value. Must be 'ADMIN', 'EDITOR', or 'MEMBER'.",
+      }, { status: 400 });
+    }
+    return NextResponse.json({
+      message: `Successfully updated the role for user ${id}.`,
+    }, { status: 200 });
   } catch (error) {
     return NextResponse.json({
       message: "An error occurred while processing the PATCH request.",

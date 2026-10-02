@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RateLimiter } from "../../rateLimiter";
 export async function GET(request: NextRequest) {
   try {
+    const rateLimiter = RateLimiter(request);
+    if (!rateLimiter.allowed) {
+      return NextResponse.json({
+        error: rateLimiter.message,
+        retryAfter: rateLimiter.retryAfter
+      },
+        { status: rateLimiter.status });
+    }
     const response = await fetch(
       `${process.env.CLUB_API_URL}/club/admin/users/me`,
       {

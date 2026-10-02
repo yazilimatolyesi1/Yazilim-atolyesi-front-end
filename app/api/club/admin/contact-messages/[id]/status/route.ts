@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-export const PATCH = async (request: NextRequest) => {
-  const messageid = request.nextUrl.pathname.split('/').pop();
+export const PATCH = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const { id } = await params;
+  const body = await request.json();
+  const { status } = body;
   try {
     return NextResponse.json({
-      message: `PATCH request received for contact message ${messageid}.`,
+      id,
+      status,
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({

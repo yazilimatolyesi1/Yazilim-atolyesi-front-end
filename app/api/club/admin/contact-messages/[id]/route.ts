@@ -1,18 +1,42 @@
-import { NextResponse } from "next/server";
-export const GET = async (request: NextResponse) => {
-  const { searchParams } = new URL(request.url);
-  const messageid = searchParams.get("message") || "No message provided";
+import { NextRequest, NextResponse } from "next/server";
+import { RateLimiter } from "../../rateLimiter";
+export const GET = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const { id } = await params;
   try {
-    return NextResponse.json({ message: `get: ${messageid} ` }, { status: 200 })
+    const rateLimiter = RateLimiter(request);
+    if (!rateLimiter.allowed) {
+      return NextResponse.json({
+        error: rateLimiter.message,
+        retryAfter: rateLimiter.retryAfter
+      },
+        { status: rateLimiter.status });
+    }
+    return NextResponse.json({ id }, { status: 200 })
   } catch (error) {
     return NextResponse.json({ message: "Error occurred" }, { status: 500 })
   };
 };
-export const DELETE = async (request: NextResponse) => {
-  const { searchParams } = new URL(request.url);
-  const messageid = searchParams.get("message") || "No message provided";
+export const DELETE = async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const { id } = await params;
   try {
-    return NextResponse.json({ message: `deleted: ${messageid} ` }, { status: 200 })
+    const rateLimiter = RateLimiter(request);
+    if (!rateLimiter.allowed) {
+      return NextResponse.json({
+        error: rateLimiter.message,
+        retryAfter: rateLimiter.retryAfter
+      },
+        { status: rateLimiter.status });
+    }
+    return NextResponse.json({
+      id,
+      deleted: true,
+    }, { status: 200 })
   } catch (error) {
     return NextResponse.json({ message: "Error occurred" }, { status: 500 })
   };

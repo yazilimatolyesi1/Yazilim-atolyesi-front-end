@@ -1,9 +1,10 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import path from "node:path";
+import { test, expect, type APIRequestContext, type Route } from "@playwright/test";
+import { cleanupSql, sql, sqlEnabled, sqlSkipReason, sqlTarget } from "./support/db";
 
 test.describe.configure({ mode: "serial" });
 // Real local Spring/PostgreSQL only. No mocked successful API responses.
+// Kesinti senaryosu istisnadir: gunluk backend'i DURDURMAZ, tarayicida
+// taklit edilir (bkz. "servis kesintisi" testi).
 const origin = process.env.UI_TEST_URL || "http://localhost:3001";
 const backend = process.env.E2E_API_URL || "http://127.0.0.1:8080/api/v1";
 for (const url of [origin, backend]) {
@@ -18,15 +19,11 @@ let admin: APIRequestContext;
 let registration: Record<string, any>;
 const announcements: string[] = [];
 const messages: string[] = [];
-const compose = path.resolve(__dirname, "../../../compose.local.yaml");
-
-function sql(query: string) {
-  return execFileSync("docker", ["compose", "-f", compose, "exec", "-T", "postgres",
-    "psql", "-U", "yazilim_atolyesi", "-d", "yazilim_atolyesi", "-tAc", query],
-    { encoding: "utf8" }).trim();
-}
 
 test.beforeAll(async ({ playwright }) => {
+  console.warn(sqlEnabled
+    ? `\n  [E2E] Ham SQL ACIK. Hedef: ${sqlTarget}\n`
+    : `\n  [E2E] ${sqlSkipReason}\n        Kalici veri (PENDING basvuru, KVKK kaydi, mesaj satiri) dogrulanmadi.\n`);
   const auth = await playwright.request.newContext();
   const login = await auth.post(`${backend}/auth/login`, { data: {
     email: process.env.E2E_ADMIN_EMAIL || "admin@yazilimatolyesi.local",
@@ -56,7 +53,7 @@ test.afterAll(async () => {
     await admin.dispose();
   }
   // There is no user DELETE endpoint. Remove only this run's synthetic account.
-  sql(`DELETE FROM app_users WHERE email = '${email}';`);
+  cleanupSql([email]);
 });
 
 test("gerçek duyurular: ana sayfa, arama, sayfalama, detay ve boş sonuç", async ({ page }) => {
@@ -101,8 +98,11 @@ test("üyelik: kayıt, kalıcı veri, yanlış şifre, giriş, yenileme, onay ve
   const user = await response.json();
   expect(user.membershipStatus).toBe("PENDING");
   await expect(page.getByRole("heading", { name: "Başvurun alındı." })).toBeVisible();
-  expect(sql(`SELECT count(*) FROM app_users u JOIN membership_applications m ON m.user_id=u.id WHERE u.email='${email}' AND m.status='PENDING';`)).toBe("1");
-  expect(sql(`SELECT count(*) FROM user_consent_records c JOIN app_users u ON u.id=c.user_id WHERE u.email='${email}';`)).toBe("2");
+  // Veritabanı dogrulamasi ham SQL gerektirir ve varsayilan olarak kapalidir.
+  if (sqlEnabled) {
+    expect(sql(`SELECT count(*) FROM app_users u JOIN membership_applications m ON m.user_id=u.id WHERE u.email='${email}' AND m.status='PENDING';`)).toBe("1");
+    expect(sql(`SELECT count(*) FROM user_consent_records c JOIN app_users u ON u.id=c.user_id WHERE u.email='${email}';`)).toBe("2");
+  }
   await page.goto("/giris-yap");
   await page.locator('.auth-panel [name="email"]').fill(email);
   await page.locator('[name="password"]').fill("WrongTest123!");
@@ -171,7 +171,7 @@ test("iletişim formu gerçek veritabanına yazılır", async ({ page }) => {
   for (const item of data.content) messages.push(item.id);
   expect(data.content).toHaveLength(1);
   expect(data.content[0].email).toBe(email);
-  expect(sql(`SELECT count(*) FROM contact_messages WHERE email='${email}' AND subject='${run}';`)).toBe("1");
+  if (sqlEnabled) expect(sql(`SELECT count(*) FROM contact_messages WHERE email='${email}' AND subject='${run}';`)).toBe("1");
 });
 
 test("geçersiz oturum temizlenir", async ({ page, context }) => {
@@ -181,43 +181,57 @@ test("geçersiz oturum temizlenir", async ({ page, context }) => {
   await expect.poll(async () => (await context.cookies()).some(c => c.name === "club_session")).toBe(false);
 });
 
-test("gerçek backend kesintisi: form korunur, örnek veri gösterilmez, servis geri gelir", async ({ page, context }) => {
+const outageBody = { message: "Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar dene." };
+
+test("servis kesintisi: form korunur, örnek veri gösterilmez, tekrar denemeyle düzelir", async ({ page }) => {
+  // Kesinti ARTIK gercek backend'i durdurmaz. Proxy'nin backend'e ulasamasi
+  // taklit edilerek 503 ve 502 uzerinden ayni kullanici deneyimi dogrulanir;
+  // boylece gunluk stack ve diger gelistiriciler etkilenmez.
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
+  const outage = (route: Route) => route.fulfill({ status: 503, json: outageBody });
+  await page.route("**/api/club/**", outage);
+
+  await page.goto("/duyurular");
+  await expect(page.locator(".content-note")).toContainText("Sunucuya şu anda ulaşılamıyor.");
+  await expect(page.locator(".announcement-card")).toHaveCount(0);
+
   await page.goto("/");
-  await page.getByRole("button", { name: "Mesaj gönder", exact: true }).click();
+  await page.getByRole("button", { name: "Mesaj gönder", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("textbox", { name: "Ad soyad" }).fill("Kesinti Testi");
   await dialog.getByRole("textbox", { name: "E-posta" }).fill(email);
   await dialog.getByRole("textbox", { name: "Konu", exact: true }).fill(`${run}-kesinti`);
   await dialog.getByRole("textbox", { name: "Mesajın", exact: true }).fill("Bağlantı kesildiğinde bu mesaj formda korunmalıdır.");
-  execFileSync("docker", ["compose", "-f", compose, "stop", "backend"], { stdio: "pipe" });
-  try {
-    const failed = page.waitForResponse(r => r.url().endsWith("/api/club/contact/messages"));
-    await dialog.getByRole("button", { name: "Mesaj gönder", exact: true }).click();
-    expect((await failed).status()).toBe(503);
-    await expect(dialog.getByRole("alert")).toContainText("Sunucuya şu anda ulaşılamıyor.");
-    await expect(dialog.getByRole("textbox", { name: "Konu", exact: true })).toHaveValue(`${run}-kesinti`);
-    await expect(dialog.getByRole("heading", { name: "Mesajın bize ulaştı." })).toHaveCount(0);
-    const offline = await context.newPage();
-    await offline.goto("/");
-    await expect(offline.locator("#duyurular")).toContainText("Duyurular şu anda yüklenemiyor.");
-    await expect(offline.locator("#duyurular .announcement-card")).toHaveCount(0);
-    await offline.goto("/duyurular");
-    await expect(offline.getByRole("status")).toContainText("Sunucuya şu anda ulaşılamıyor.");
-    await expect(offline.locator(".announcement-card")).toHaveCount(0);
-    await offline.close();
-  } finally {
-    execFileSync("docker", ["compose", "-f", compose, "start", "backend"], { stdio: "pipe" });
-    await expect.poll(async () => {
-      try { return (await fetch(`${backend}/membership/options`)).status; }
-      catch { return 0; }
-    }, { timeout: 60_000, intervals: [1000] }).toBe(200);
-  }
-  const restored = page.waitForResponse(r => r.url().endsWith("/api/club/contact/messages"));
+
+  const failed = page.waitForResponse(r => r.url().endsWith("/api/club/contact/messages"));
   await dialog.getByRole("button", { name: "Mesaj gönder", exact: true }).click();
+  expect((await failed).status()).toBe(503);
+  await expect(dialog.getByRole("alert")).toContainText("Sunucuya şu anda ulaşılamıyor.");
+  await expect(dialog.getByRole("textbox", { name: "Konu", exact: true })).toHaveValue(`${run}-kesinti`);
+  await expect(dialog.getByRole("textbox", { name: "Mesajın", exact: true })).toHaveValue("Bağlantı kesildiğinde bu mesaj formda korunmalıdır.");
+  await expect(dialog.getByRole("heading", { name: "Mesajın bize ulaştı." })).toHaveCount(0);
+
+  // Gercek baglanti hatasi (proxy yanit vermiyor) farkli bir mesaj gosterir.
+  await page.unroute("**/api/club/**");
+  await page.route("**/api/club/**", route => route.abort("connectionfailed"));
+  await page.goto("/duyurular");
+  await expect(page.locator(".content-note")).toContainText("Bağlantı kurulamadı");
+  await expect(page.locator(".announcement-card")).toHaveCount(0);
+
+  // Servis geri gelince ayni form, ayni verilerle tekrar gonderilir.
+  await page.unroute("**/api/club/**");
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mesaj gönder", exact: true }).first().click();
+  const form = page.getByRole("dialog");
+  await form.getByRole("textbox", { name: "Konu", exact: true }).fill(`${run}-kesinti`);
+  await form.getByRole("textbox", { name: "Ad soyad" }).fill("Kesinti Testi");
+  await form.getByRole("textbox", { name: "E-posta" }).fill(email);
+  await form.getByRole("textbox", { name: "Mesajın", exact: true }).fill("Bağlantı kesildiğinde bu mesaj formda korunmalıdır.");
+  const restored = page.waitForResponse(r => r.url().endsWith("/api/club/contact/messages"));
+  await form.getByRole("button", { name: "Mesaj gönder", exact: true }).click();
   const response = await restored;
   expect(response.status()).toBe(201);
   messages.push((await response.json()).id);
-  await expect(dialog.getByRole("heading", { name: "Mesajın bize ulaştı." })).toBeVisible();
+  await expect(form.getByRole("heading", { name: "Mesajın bize ulaştı." })).toBeVisible();
 });

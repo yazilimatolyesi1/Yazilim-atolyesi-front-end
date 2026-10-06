@@ -6,6 +6,8 @@ const id = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 const routes: Record<string, RegExp[]> = {
   GET: [
     /^(announcements|membership\/options|settings\/public|users\/me)$/,
+    // Duyuru detayı slug ile gelir; UUID değil slug.
+    /^announcements\/[^/]+$/,
     /^pages\/(HOME|ABOUT|CONTACT)$/,
     new RegExp(`^media/images/${id}$`),
     new RegExp(`^admin/(announcements|contents|settings|contact-messages|members|users)(/${id})?$`),

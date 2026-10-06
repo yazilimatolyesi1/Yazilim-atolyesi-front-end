@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { request } from "../../lib/api";
 import type { MemberDetail, MemberRecord, MessageRecord, PageResult, Profile, Role, UserRecord } from "../../lib/admin-types";
-import { Badge, date, ErrorNotice, ListState, Modal, names, Options, Pagination, useMutation, useRemote } from "./shared";
+import { Badge, date, ErrorNotice, ListState, Modal, names, Options, Pagination, useMutation, useOperation, useRemote } from "./shared";
 import s from "./dashboard.module.css";
 
 export function People({ kind, profile }: { kind: "members" | "users" | "contact-messages"; profile: Profile }) {
@@ -10,7 +10,7 @@ export function People({ kind, profile }: { kind: "members" | "users" | "contact
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<MemberRecord | UserRecord | MessageRecord | null>(null);
-  const [notice, setNotice] = useState("");
+  const operation = useOperation();
   const members = kind === "members", users = kind === "users";
   const remote = useRemote<PageResult<MemberRecord | UserRecord | MessageRecord>>(`admin/${kind}?page=${page}&size=10&q=${encodeURIComponent(query)}${filter ? `&${members ? "membershipStatus" : "status"}=${filter}` : ""}`);
   return <>
@@ -18,19 +18,19 @@ export function People({ kind, profile }: { kind: "members" | "users" | "contact
       <label>Durum<select value={filter} onChange={e => { setFilter(e.target.value); setPage(0); }}><option value="">Tümü</option><Options values={members ? ["PENDING", "APPROVED", "REJECTED"] : users ? ["ACTIVE", "PASSIVE", "SUSPENDED"] : ["NEW", "READ", "REPLIED", "ARCHIVED"]} /></select></label>
       <button className={s.secondary} onClick={remote.refresh}>Yenile ↻</button>
     </div>
-    {notice && <p className={s.success} role="status">{notice}</p>}
+    {operation.node}
     <div className={s.card}><ListState loading={remote.loading} error={remote.error} empty={!remote.data?.content.length} retry={remote.refresh} />
       {!remote.loading && !remote.error && !!remote.data?.content.length && <div className={s.tableScroll}><table><thead><tr><th>{members || users ? "Kişi" : "Gönderen"}</th><th>{members ? "Eğitim" : users ? "Roller" : "Konu"}</th><th>Durum</th><th>Tarih</th><th><span className="sr-only">İşlem</span></th></tr></thead><tbody>{remote.data.content.map(item => {
         const member = item as MemberRecord, user = item as UserRecord, message = item as MessageRecord;
         return <tr key={members ? member.userId : user.id}><td><strong>{members || users ? `${user.firstName} ${user.lastName}` : message.name}</strong><small>{item.email}</small></td>
           <td>{members ? <>{member.institutionName || "—"}<small>{member.department}</small></> : users ? user.roles.map(role => names[role]).join(", ") || "Rol verilmedi" : message.subject}</td>
           <td><Badge value={members ? member.membershipStatus : user.status} /></td><td>{date(members ? member.appliedAt : user.createdAt)}</td>
-          <td><button className={s.tableButton} onClick={() => { setSelected(item); setNotice(""); }}>{members ? "İncele" : users ? "Yönet" : "Mesajı aç"} →</button></td>
+          <td><button className={s.tableButton} onClick={() => { setSelected(item); operation.clear(); }}>{members ? "İncele" : users ? "Yönet" : "Mesajı aç"} →</button></td>
         </tr>;
       })}</tbody></table></div>}
       {remote.data && !remote.loading && !remote.error && <Pagination page={page} pages={remote.data.totalPages} total={remote.data.totalElements} setPage={setPage} />}
     </div>
-    {selected && (members ? <MemberReview userId={(selected as MemberRecord).userId} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); setNotice("Başvuru kararı kaydedildi."); remote.refresh(); }} /> : users ? <UserEditor user={selected as UserRecord} own={profile.userId === (selected as UserRecord).id} onClose={() => setSelected(null)} onSaved={() => { remote.refresh(); }} /> : <MessageEditor message={selected as MessageRecord} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); setNotice("Mesaj güncellendi."); if (remote.data?.content.length === 1 && page > 0) setPage(page - 1); else remote.refresh(); }} />)}
+    {selected && (members ? <MemberReview userId={(selected as MemberRecord).userId} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); operation.setNotice("Başvuru kararı kaydedildi."); remote.refresh(); }} /> : users ? <UserEditor user={selected as UserRecord} own={profile.userId === (selected as UserRecord).id} onClose={() => setSelected(null)} onSaved={() => { remote.refresh(); }} /> : <MessageEditor message={selected as MessageRecord} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); operation.setNotice("Mesaj güncellendi."); if (remote.data?.content.length === 1 && page > 0) setPage(page - 1); else remote.refresh(); }} />)}
   </>;
 }
 
@@ -56,14 +56,14 @@ function MemberReview({ userId, onClose, onSaved }: { userId: string; onClose: (
 function UserEditor({ user, own, onClose, onSaved }: { user: UserRecord; own: boolean; onClose: () => void; onSaved: () => void }) {
   const [roles, setRoles] = useState<Role[]>(user.roles);
   const [status, setStatus] = useState(user.status);
-  const [notice, setNotice] = useState("");
+  const operation = useOperation();
   const action = useMutation();
-  return <Modal title="Kullanıcı yönetimi" onClose={onClose} busy={action.busy}><div className={s.form}><h3>{user.firstName} {user.lastName}</h3><p>{user.email}</p><ErrorNotice error={action.error} />{notice && <p className={s.success} role="status">{notice}</p>}
+  return <Modal title="Kullanıcı yönetimi" onClose={onClose} busy={action.busy}><div className={s.form}><h3>{user.firstName} {user.lastName}</h3><p>{user.email}</p><ErrorNotice error={action.error} />{operation.node}
     {own && <p className={s.hint}>Kendi yönetici erişimini kaybetmemek için bu panelden kendi rolünü ve hesap durumunu değiştiremezsin.</p>}
     <fieldset disabled={own || action.busy}><legend>Roller</legend><div className={s.checks}>{(["ADMIN", "EDITOR", "MEMBER"] as Role[]).map(role => <label key={role}><input type="checkbox" checked={roles.includes(role)} onChange={e => setRoles(previous => e.target.checked ? [...previous, role] : previous.filter(r => r !== role))} />{names[role]}</label>)}</div>
-      <button className={s.secondary} onClick={() => { void action.run(async () => { await request(`admin/users/${user.id}/roles`, { method: "PATCH", body: JSON.stringify({ roles }) }); setNotice("Roller güncellendi."); onSaved(); }); }}>Rolleri kaydet</button>
+      <button className={s.secondary} onClick={() => { void action.run(async () => { await request(`admin/users/${user.id}/roles`, { method: "PATCH", body: JSON.stringify({ roles }) }); operation.setNotice("Roller güncellendi."); onSaved(); }); }}>Rolleri kaydet</button>
       <label>Hesap durumu<select aria-label="Hesap durumu" value={status} onChange={e => setStatus(e.target.value)}><Options values={["ACTIVE", "PASSIVE", "SUSPENDED"]} /></select></label>
-      <button className={s.secondary} onClick={() => { void action.run(async () => { await request(`admin/users/${user.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); setNotice("Hesap durumu güncellendi."); onSaved(); }); }}>Durumu kaydet</button>
+      <button className={s.secondary} onClick={() => { void action.run(async () => { await request(`admin/users/${user.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); operation.setNotice("Hesap durumu güncellendi."); onSaved(); }); }}>Durumu kaydet</button>
     </fieldset><footer className={s.formActions}><button className={s.primary} disabled={action.busy} onClick={onClose}>Tamam</button></footer>
   </div></Modal>;
 }

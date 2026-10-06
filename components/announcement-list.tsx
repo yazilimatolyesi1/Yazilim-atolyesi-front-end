@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { request } from "../lib/api";
+import { isAborted, request } from "../lib/api";
+import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from "../lib/use-debounced-value";
 import type { Announcement } from "../lib/content";
 import { mapAnnouncement, type ApiAnnouncement } from "../lib/announcement";
 import { Icon } from "./icon";
@@ -15,33 +16,33 @@ export function AnnouncementList() {
   const [totalPages, setTotalPages] = useState(1);
   const [query, setQuery] = useState("");
   const [retry, setRetry] = useState(0);
+  // Arama kutusu anında güncellenir; istek ~300 ms bekletilir.
+  const settledQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
     request<{ content: ApiAnnouncement[]; totalPages: number }>(
-      `announcements?page=${page}&size=9&q=${encodeURIComponent(query)}`,
+      `announcements?page=${page}&size=9&q=${encodeURIComponent(settledQuery)}`,
+      { signal: controller.signal },
     )
       .then((data) => {
-        if (active) {
-          setItems(data.content.map(mapAnnouncement));
-          setTotalPages(data.totalPages);
-        }
+        if (controller.signal.aborted) return;
+        setItems(data.content.map(mapAnnouncement));
+        setTotalPages(data.totalPages);
       })
       .catch((err) => {
-        if (active) {
-          setError(err.message);
-          setItems([]);
-          setTotalPages(1);
-        }
+        // İptal edilen istek hata sayılmaz; eski cevap listeyi ezmeyebilir.
+        if (controller.signal.aborted || isAborted(err)) return;
+        setError(err.message);
+        setItems([]);
+        setTotalPages(1);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
-  }, [page, query, retry]);
+    return () => { controller.abort(); };
+  }, [page, settledQuery, retry]);
   return (
     <>
       <div className="list-tools">

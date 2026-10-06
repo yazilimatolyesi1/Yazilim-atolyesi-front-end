@@ -1,0 +1,20 @@
+# Satir sonlarini her makinede ayni tut: depo LF saklar, calisma alani da LF olur.
+# Sistem duzeyindeki core.autocrlf=true ayarini bu depo icin gecersiz kilar.
+* text=auto eol=lf
+
+# Ikili dosyalar: satir sonu ve metin donusumu uygulanmaz.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
+
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf

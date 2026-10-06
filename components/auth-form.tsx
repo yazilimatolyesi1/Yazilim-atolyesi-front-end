@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ApiError, request } from "../lib/api";
+import { FieldErrors } from "./admin/shared";
 import { useRouter } from "next/navigation";
 
 type Options = {
@@ -305,13 +306,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {error && (
           <div className="form-error">
             <p>{error.message}</p>
-            {error.fieldErrors.length > 0 && (
-              <ul>
-                {error.fieldErrors.map((field, i) => (
-                  <li key={i}>{field.message}</li>
-                ))}
-              </ul>
-            )}
+            <FieldErrors error={error} />
           </div>
         )}
         {done && (

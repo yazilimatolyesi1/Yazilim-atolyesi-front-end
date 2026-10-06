@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { cleanupSql } from "./support/db";
 
 test.describe.configure({ mode: "serial" });
 const origin = process.env.UI_TEST_URL || "http://localhost:3001";
@@ -61,7 +61,7 @@ test.afterAll(async () => {
     expect([204, 404]).toContain(response.status());
   }
   if (messageId) expect([204, 404]).toContain((await admin.delete(`admin/contact-messages/${messageId}`)).status());
-  execFileSync("docker", ["compose", "-f", path.resolve(__dirname, "../../../compose.local.yaml"), "exec", "-T", "postgres", "psql", "-U", "yazilim_atolyesi", "-d", "yazilim_atolyesi", "-c", `DELETE FROM app_users WHERE email IN ('${memberEmail}', '${editorEmail}');`], { stdio: "pipe" });
+  cleanupSql([memberEmail, editorEmail]);
   await admin?.dispose();
 });
 
@@ -112,7 +112,9 @@ test("yönetici girişi, duyuru oluşturma, görsel, yayınlama, düzenleme ve s
   await expect(image).toBeVisible();
   await expect.poll(async () => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await page.getByRole("searchbox").fill(run);
-  await page.getByRole("button", { name: "Düzenle", exact: true }).click();
+  const announcementRow = page.getByRole("row").filter({ hasText: run });
+  await expect(announcementRow).toHaveCount(1);
+  await announcementRow.getByRole("button", { name: "Düzenle", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Başlık", { exact: true }).fill(`${run} güncellendi`);
   await dialog.getByRole("button", { name: "Kaydet", exact: true }).click();
@@ -121,7 +123,7 @@ test("yönetici girişi, duyuru oluşturma, görsel, yayınlama, düzenleme ve s
   await publicPage.getByRole("searchbox").fill(run);
   await expect(publicPage.locator(".announcement-card")).toContainText(`${run} güncellendi`);
   page.once("dialog", d => d.accept());
-  await page.getByRole("button", { name: "Sil", exact: true }).click();
+  await announcementRow.getByRole("button", { name: "Sil", exact: true }).first().click();
   await expect(page.getByText("Kayıt silindi.")).toBeVisible();
   await publicPage.reload();
   await publicPage.getByRole("searchbox").fill(run);
@@ -134,23 +136,32 @@ test("başvuru kararı, kullanıcı rolü ve mesaj durumu panelden yönetilir", 
   await expect(page).toHaveURL(/yonetim/);
   await tab(page, "Üyelik başvuruları");
   await page.getByRole("searchbox").fill(memberEmail);
-  await page.getByRole("button", { name: "İncele →", exact: true }).click();
+  // Arama debounce'ludur; filtre uygulanmadan satıra tıklamak yanlış kayda
+  // (diğer sentetik hesap) işlem uygular. Bu yüzden satır önce beklenir ve
+  // tüm işlemler o satırla sınırlandırılır.
+  const application = page.getByRole("row").filter({ hasText: memberEmail });
+  await expect(application).toHaveCount(1);
+  await application.getByRole("button", { name: "İncele →", exact: true }).click();
   let dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(memberEmail);
   await expect(dialog).toContainText("Panel uçtan uca testi");
   await dialog.getByLabel("Karar", { exact: true }).selectOption("REJECTED");
   await dialog.getByRole("textbox", { name: "Değerlendirme notu" }).fill("Test başvurusunun bilgileri eksik.");
   await dialog.getByRole("button", { name: "Kararı kaydet" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("table")).toContainText("Reddedildi");
-  await page.getByRole("button", { name: "İncele →", exact: true }).click();
+  await expect(application).toContainText("Reddedildi");
+  await application.getByRole("button", { name: "İncele →", exact: true }).click();
   dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(memberEmail);
   await dialog.getByLabel("Karar", { exact: true }).selectOption("APPROVED");
   await dialog.getByRole("button", { name: "Kararı kaydet" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("table")).toContainText("Onaylandı");
+  await expect(application).toContainText("Onaylandı");
   await tab(page, "Kullanıcılar");
   await page.getByRole("searchbox").fill(memberEmail);
-  await page.getByRole("button", { name: "Yönet →", exact: true }).click();
+  const memberRow = page.getByRole("row").filter({ hasText: memberEmail });
+  await expect(memberRow).toHaveCount(1);
+  await memberRow.getByRole("button", { name: "Yönet →", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "Editör", exact: true }).check();
   await dialog.getByRole("button", { name: "Rolleri kaydet" }).click();
@@ -163,13 +174,15 @@ test("başvuru kararı, kullanıcı rolü ve mesaj durumu panelden yönetilir", 
   expect(user.roles).toContain("EDITOR"); expect(user.status).toBe("SUSPENDED");
   await tab(page, "Gelen mesajlar");
   await page.getByRole("searchbox").fill(run);
-  await page.getByRole("button", { name: "Mesajı aç →", exact: true }).click();
+  const messageRow = page.getByRole("row").filter({ hasText: run });
+  await expect(messageRow).toHaveCount(1);
+  await messageRow.getByRole("button", { name: "Mesajı aç →", exact: true }).click();
   dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("Yönetim panelinden okunacak test mesajı.");
   await dialog.getByLabel("Mesaj durumu", { exact: true }).selectOption("READ");
   await dialog.getByRole("button", { name: "Durumu kaydet" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("table")).toContainText("Okundu");
+  await expect(messageRow).toContainText("Okundu");
 });
 
 test("içerik ve site ayarı değişikliği ziyaretçiye yansır", async ({ page, context }) => {
@@ -191,7 +204,9 @@ test("içerik ve site ayarı değişikliği ziyaretçiye yansır", async ({ page
   await publicPage.goto("/");
   await expect(publicPage.getByText("Panelden gelen güncel ana sayfa metni.")).toBeVisible();
   await page.getByRole("searchbox").fill(run);
-  await page.getByRole("button", { name: "Düzenle", exact: true }).click();
+  const contentRow = page.getByRole("row").filter({ hasText: run });
+  await expect(contentRow).toHaveCount(1);
+  await contentRow.getByRole("button", { name: "Düzenle", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByRole("checkbox", { name: "Sitede göster", exact: true }).uncheck();
   await dialog.getByRole("button", { name: "Kaydet", exact: true }).click();
@@ -200,7 +215,9 @@ test("içerik ve site ayarı değişikliği ziyaretçiye yansır", async ({ page
   await expect(publicPage.getByText("Panelden gelen güncel ana sayfa metni.")).toHaveCount(0);
   await tab(page, "Site ayarları");
   await page.getByRole("searchbox").fill("contact.email");
-  await page.getByRole("button", { name: "Düzenle", exact: true }).click();
+  const settingRow = page.getByRole("row").filter({ hasText: "contact.email" });
+  await expect(settingRow).toHaveCount(1);
+  await settingRow.getByRole("button", { name: "Düzenle", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Değer", { exact: true }).fill(`${run}@example.test`);
   await dialog.getByRole("button", { name: "Kaydet", exact: true }).click();

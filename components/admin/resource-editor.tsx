@@ -1,9 +1,9 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { request } from "../../lib/api";
 import type { AnnouncementRecord, ContentRecord, SettingRecord } from "../../lib/admin-types";
 import { mediaUrl } from "../../lib/media";
-import { ErrorNotice, Modal, Options, useMutation } from "./shared";
+import { ErrorNotice, FieldErrors, Modal, Options, useMutation, useOperation, useUnsavedChanges } from "./shared";
 import s from "./dashboard.module.css";
 
 export type ResourceKind = "announcements" | "contents" | "settings";
@@ -14,12 +14,29 @@ function localDate(value?: string) {
   const d = new Date(value);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
+/** Formun o anki metin alanlarını sıralı bir dizeye çevirir; ilk durumla karşılaştırmak için. */
+function snapshot(form: HTMLFormElement) {
+  return Array.from(new FormData(form).entries())
+    .filter(([, value]) => typeof value === "string")
+    .map(([key, value]) => `${key}=${value as string}`)
+    .sort()
+    .join("|");
+}
 export function ResourceEditor({ kind, value = {}, onClose, onSaved }: { kind: ResourceKind; value?: EditorValue; onClose: () => void; onSaved: () => void }) {
   const action = useMutation();
   const upload = useMutation();
+  const operation = useOperation();
   const [image, setImage] = useState(value.coverImageUrl || value.imageUrl || "");
+  const [dirty, setDirty] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const initial = useRef("");
+  const confirmClose = useUnsavedChanges(dirty);
   const isAnnouncement = kind === "announcements";
   const isContent = kind === "contents";
+  // Başlangıç değerleri DOM'a yazıldıktan sonra okunur.
+  useEffect(() => { if (formRef.current) initial.current = snapshot(formRef.current); }, []);
+  // Kaydedilmemiş değişiklik uyarısı: kapatma, Vazgeç, Escape ve dış tıklama bu yoldan geçer.
+  const guardedClose = () => { if (confirmClose()) onClose(); };
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -44,12 +61,14 @@ export function ResourceEditor({ kind, value = {}, onClose, onSaved }: { kind: R
         };
       } else payload = { key: text("key"), value: text("value"), type: text("type"), description: text("description"), publicSetting: check("publicSetting") };
       await request(`admin/${kind}${value.id ? `/${value.id}` : ""}`, { method: value.id ? "PUT" : "POST", body: JSON.stringify(payload) });
+      setDirty(false);
       onSaved();
     });
   }
-  return <Modal title={`${labels[kind]} ${value.id ? "düzenle" : "oluştur"}`} onClose={onClose} busy={action.busy || upload.busy}>
-    <form className={s.form} onSubmit={save}>
+  return <Modal title={`${labels[kind]} ${value.id ? "düzenle" : "oluştur"}`} onClose={guardedClose} busy={action.busy || upload.busy}>
+    <form className={s.form} ref={formRef} onSubmit={save} onChange={e => setDirty(snapshot(e.currentTarget) !== initial.current || image !== (value.coverImageUrl || value.imageUrl || ""))}>
       <ErrorNotice error={action.error} />
+      <FieldErrors error={action.error} field="title" />
       <fieldset disabled={action.busy || upload.busy}>
         {isContent && <div className={s.formGrid}><label>Sayfa<select aria-label="Sayfa" name="page" defaultValue={value.page || "HOME"}><Options values={["HOME", "ABOUT", "CONTACT"]} /></select></label><label>İçerik türü<select aria-label="Tür" name="type" defaultValue={value.type || "TEXT"}><Options values={["HERO", "SLIDER", "TEXT", "FEATURE", "CONTACT_INFO", "CUSTOM"]} /></select></label></div>}
         {kind !== "announcements" && <label>Anahtar<input name="key" required maxLength={100} pattern={isContent ? "[a-z0-9]+(?:-[a-z0-9]+)*" : "[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*"} defaultValue={value.key || ""} placeholder={isContent ? "ornek-icerik" : "contact.email"} /></label>}
@@ -71,10 +90,12 @@ export function ResourceEditor({ kind, value = {}, onClose, onSaved }: { kind: R
                 const form = new FormData(); form.append("file", file); form.append("purpose", isAnnouncement ? "ANNOUNCEMENT" : "PAGE_CONTENT");
                 const result = await request<{ url: string }>("admin/media/images", { method: "POST", body: form });
                 setImage(result.url);
+                operation.setNotice("Görsel yüklendi.");
               });
             }} /></label>
             <ErrorNotice error={upload.error} />
             {upload.busy && <p role="status">Görsel yükleniyor…</p>}
+            {operation.node}
             <label>Görsel adresi<input value={image} maxLength={1000} onChange={e => setImage(e.target.value)} placeholder="Görsel yükle veya https:// adresi gir" /></label>
             <label>Görsel açıklaması<input name="imageAltText" maxLength={300} defaultValue={value.coverImageAltText || value.imageAltText || ""} /></label>
           </div>
@@ -90,7 +111,7 @@ export function ResourceEditor({ kind, value = {}, onClose, onSaved }: { kind: R
           <p className={s.muted}>Herkese açık ayarlar ziyaretçilere gönderilir. KVKK metnini değiştirirken ilgili sürüm ayarını da güncelle.</p>
         </>}
       </fieldset>
-      <footer className={s.formActions}><button type="button" className={s.secondary} disabled={action.busy || upload.busy} onClick={onClose}>Vazgeç</button><button className={s.primary} disabled={action.busy || upload.busy}>{action.busy ? "Kaydediliyor…" : "Kaydet"}</button></footer>
+      <footer className={s.formActions}><button type="button" className={s.secondary} disabled={action.busy || upload.busy} onClick={guardedClose}>Vazgeç</button><button className={s.primary} disabled={action.busy || upload.busy}>{action.busy ? "Kaydediliyor…" : "Kaydet"}</button></footer>
     </form>
   </Modal>;
 }

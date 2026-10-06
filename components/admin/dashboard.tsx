@@ -6,7 +6,7 @@ import type { ContentRecord, MemberRecord, MessageRecord, PageResult, Profile } 
 import { Resources } from "./resources";
 import { People } from "./people";
 import { TeamBoard } from "./team-board";
-import { Badge, date, ErrorNotice, names, useMutation } from "./shared";
+import { Badge, date, ErrorNotice, names, useMutation, useOperation } from "./shared";
 import s from "./dashboard.module.css";
 
 const navigation = [
@@ -89,15 +89,20 @@ function Overview({ admin, name, navigate }: { admin: boolean; name: string; nav
 
 function Account() {
   const action = useMutation();
-  const [done, setDone] = useState(false);
+  const end = useMutation();
+  const operation = useOperation();
+  const router = useRouter();
   return <div className={s.card}><form className={s.form} onSubmit={e => {
     e.preventDefault(); const form = e.currentTarget; const fields = new FormData(form);
+    operation.clear();
     void action.run(async () => {
       if (fields.get("newPassword") !== fields.get("confirmation")) throw new Error("Yeni şifreler eşleşmiyor.");
       await request("users/me/password", { method: "PATCH", body: JSON.stringify({ currentPassword: fields.get("currentPassword"), newPassword: fields.get("newPassword") }) });
-      form.reset(); setDone(true);
+      form.reset(); operation.setNotice("Şifren güncellendi.");
     });
-  }}><h2>Şifreni değiştir</h2><ErrorNotice error={action.error} />{done && <p className={s.success} role="status">Şifren güncellendi.</p>}<fieldset disabled={action.busy}>
+  }}><h2>Şifreni değiştir</h2><ErrorNotice error={action.error} /><ErrorNotice error={end.error} />{operation.notice && <>{operation.node}
+    <p className={s.hint}>Şifre değişince hesabın bu backend'de geçersiz kılınmaz; bu yüzden çıkış yapmayı sen seçersin. Diğer cihazlardaki oturumlar yeni şifreyle açılmaya devam eder.</p>
+    <button type="button" className={s.secondary} disabled={end.busy} onClick={() => { void end.run(async () => { await request("auth/logout", { method: "POST" }); router.replace("/giris-yap"); router.refresh(); }); }}>{end.busy ? "Çıkılıyor…" : "Bu tarayıcıdan çıkış yap"}</button></>}<fieldset disabled={action.busy}>
     <label>Mevcut şifre<input name="currentPassword" type="password" autoComplete="current-password" required /></label>
     <label>Yeni şifre<input aria-label="Yeni şifre" name="newPassword" type="password" autoComplete="new-password" minLength={8} maxLength={72} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).+" required /><small>8–72 karakter; büyük harf, küçük harf ve rakam.</small></label>
     <label>Yeni şifre tekrar<input name="confirmation" type="password" autoComplete="new-password" required /></label>

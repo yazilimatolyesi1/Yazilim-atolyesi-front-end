@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useRef, useState } from "react";
 import { ApiError, request } from "../lib/api";
+import { FieldErrors } from "./admin/shared";
 export function ContactForm() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -52,13 +53,7 @@ export function ContactForm() {
         {error && (
           <div className="form-error">
             <p>{error.message}</p>
-            {error.fieldErrors.length > 0 && (
-              <ul>
-                {error.fieldErrors.map((f, i) => (
-                  <li key={i}>{f.message}</li>
-                ))}
-              </ul>
-            )}
+            <FieldErrors error={error} />
           </div>
         )}
       </div>

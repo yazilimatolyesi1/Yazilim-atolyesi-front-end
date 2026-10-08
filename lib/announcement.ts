@@ -16,6 +16,7 @@ export function mapAnnouncement(item: ApiAnnouncement): Announcement {
     coverImageUrl: item.coverImageUrl,
     coverImageAltText: item.coverImageAltText,
     id: item.id,
+    slug: item.slug,
     title: item.title,
     summary: item.summary,
     content: item.content,

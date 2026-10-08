@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { isAborted, request } from "../lib/api";
 import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from "../lib/use-debounced-value";
 import type { Announcement } from "../lib/content";
@@ -8,22 +10,57 @@ import { Icon } from "./icon";
 import { Dialog } from "./dialog";
 import { mediaUrl } from "../lib/media";
 
+// Backend kategoriyi serbest metin tutar ve büyük/küçük harf duyarsız eşleştirir.
+const CATEGORIES = ["Genel", "Etkinlik", "Proje", "Eğitim"];
+
+type ListState = { q: string; category: string; page: number };
+
 export function AnnouncementList() {
+  // Arama, kategori ve sayfa URL'de tutulur; geri/ileri ve paylaşılan bağlantı aynı listeyi açar.
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q") || "";
+  const category = searchParams.get("category") || "";
+  const rawPage = Number(searchParams.get("page"));
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 0;
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [query, setQuery] = useState("");
+  const [input, setInput] = useState(query);
   const [retry, setRetry] = useState(0);
-  // Arama kutusu anında güncellenir; istek ~300 ms bekletilir.
-  const settledQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+  // Arama kutusu anında güncellenir; URL ve istek ~300 ms bekletilir.
+  const settledInput = useDebouncedValue(input, SEARCH_DEBOUNCE_MS);
+  const writtenQuery = useRef(query);
+  const navigate = (next: Partial<ListState>, replace = false) => {
+    const state = { q: query, category, page, ...next };
+    const params = new URLSearchParams();
+    if (state.q) params.set("q", state.q);
+    if (state.category) params.set("category", state.category);
+    if (state.page > 0) params.set("page", String(state.page));
+    writtenQuery.current = state.q;
+    const url = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    // Native History API Next yönlendiricisiyle eşleşir; sayfa sunucudan yeniden istenmez.
+    if (replace) window.history.replaceState(null, "", url);
+    else window.history.pushState(null, "", url);
+  };
+  useEffect(() => {
+    // Geri/ileri ile gelen arama kutuya yazılır; kendi yazdığımız değer yazmaya devam edeni ezmez.
+    if (query === writtenQuery.current) return;
+    writtenQuery.current = query;
+    setInput(query);
+  }, [query]);
+  useEffect(() => {
+    // Yalnızca bekletilmiş arama değiştiğinde çalışır; sayfa ve kategori değişimi aramayı yeniden yazmaz.
+    const q = settledInput.trim();
+    if (q !== query) navigate({ q, page: 0 }, true);
+  }, [settledInput]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    const categoryFilter = category ? `&category=${encodeURIComponent(category)}` : "";
     request<{ content: ApiAnnouncement[]; totalPages: number }>(
-      `announcements?page=${page}&size=9&q=${encodeURIComponent(settledQuery)}`,
+      `announcements?page=${page}&size=9&q=${encodeURIComponent(query)}${categoryFilter}`,
       { signal: controller.signal },
     )
       .then((data) => {
@@ -42,7 +79,8 @@ export function AnnouncementList() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => { controller.abort(); };
-  }, [page, settledQuery, retry]);
+  }, [page, query, category, retry]);
+  const filtered = Boolean(query || category);
   return (
     <>
       <div className="list-tools">
@@ -50,20 +88,34 @@ export function AnnouncementList() {
           Duyurularda ara
           <input
             type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(0);
-            }}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Başlık veya konu"
           />
+        </label>
+        <label className="category-filter">
+          Kategori
+          <select
+            value={category}
+            onChange={(e) => navigate({ category: e.target.value, page: 0 })}
+          >
+            <option value="">Tümü</option>
+            {CATEGORIES.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+            {category && !CATEGORIES.includes(category) && (
+              <option value={category}>{category}</option>
+            )}
+          </select>
         </label>
         {error && (
           <button
             type="button"
             className="club-button button-outline"
             onClick={() => {
-              setPage(0);
+              navigate({ page: 0 }, true);
               setRetry((x) => x + 1);
             }}
           >
@@ -91,7 +143,15 @@ export function AnnouncementList() {
                   <span>{item.month}</span>
                 </div>
                 <div>
-                  <h3>{item.title}</h3>
+                  <h3>
+                    {item.slug ? (
+                      <Link href={`/duyurular/${encodeURIComponent(item.slug)}`} className="card-title-link">
+                        {item.title}
+                      </Link>
+                    ) : (
+                      item.title
+                    )}
+                  </h3>
                   <p>{item.summary}</p>
                 </div>
               </div>
@@ -112,14 +172,17 @@ export function AnnouncementList() {
         </div>
       ) : (
         <p className="empty-state" role="status">
-          {query
+          {filtered
             ? "Aramana uygun duyuru bulunamadı."
             : "Henüz yayınlanmış duyuru bulunmuyor."}
-          {query && (
+          {filtered && (
             <button
               type="button"
               className="text-button"
-              onClick={() => setQuery("")}
+              onClick={() => {
+                setInput("");
+                navigate({ q: "", category: "", page: 0 });
+              }}
             >
               Aramayı temizle
             </button>
@@ -129,9 +192,10 @@ export function AnnouncementList() {
       {totalPages > 1 && (
         <nav className="pagination" aria-label="Duyuru sayfaları">
           <button
+            type="button"
             className="club-button button-outline"
             disabled={page === 0 || loading}
-            onClick={() => setPage((x) => x - 1)}
+            onClick={() => navigate({ page: page - 1 })}
           >
             Önceki
           </button>
@@ -139,9 +203,10 @@ export function AnnouncementList() {
             {page + 1} / {totalPages}
           </span>
           <button
+            type="button"
             className="club-button button-outline"
             disabled={page >= totalPages - 1 || loading}
-            onClick={() => setPage((x) => x + 1)}
+            onClick={() => navigate({ page: page + 1 })}
           >
             Sonraki
           </button>

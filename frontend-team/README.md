@@ -4,6 +4,8 @@ Tarih: 8 Ekim 2026 · Kapsam: yalnızca frontend (`app/`, `components/`, `lib/`,
 
 Kişi görev dosyaları: [01 Tasarım sistemi](01-design-system.md) · [02 Ana sayfa](02-homepage-conversion.md) · [03 Bilgi mimarisi](03-information-architecture.md) · [04 Responsive ve erişilebilirlik](04-responsive-accessibility.md) · [05 Hareket ve performans](05-motion-performance.md) · [Son denetim](FINAL-AUDIT.md)
 
+Dağıtılacak tek sayfalık PDF sürümleri `pdf/` klasöründe. Markdown dosyası değişirse yeniden üret: `python frontend-team/create_pdfs.py`.
+
 ## 1. Ürün anlayışı
 
 | Konu | Bulgu |

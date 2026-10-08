@@ -73,10 +73,16 @@ test("gerçek duyuru: listeden detaya gidilir, kategori filtresi çalışır, ol
   const created = await admin.post("admin/announcements", { data: {
     title: `${run} başlık`, slug: run, summary: "Detay sayfası test özeti.",
     content: "Detay sayfasında gösterilen\nçok satırlı test içeriği.", category: "Etkinlik",
-    status: "PUBLISHED", pinned: false, featured: false, displayOrder: 0,
+    status: "PUBLISHED", pinned: true, featured: false, displayOrder: 0,
   } });
   expect(created.status()).toBe(201);
   announcementId = (await created.json()).id;
+
+  // Ana sayfa kartı detaya gider; detay sayfası kendi başlığını taşır (paylaşım önizlemesi).
+  await page.goto("/");
+  await page.locator("#duyurular").getByRole("link", { name: `${run} başlık`, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/duyurular/${run}$`));
+  await expect(page).toHaveTitle(`${run} başlık | Yazılım Atölyesi`);
 
   await page.goto(`/duyurular?q=${run}`);
   await page.getByRole("link", { name: `${run} başlık`, exact: true }).click();

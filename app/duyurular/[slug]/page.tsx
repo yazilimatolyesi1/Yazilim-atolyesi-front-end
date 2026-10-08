@@ -1,19 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { Header } from "../../../components/header";
 import { Footer } from "../../../components/sections";
 import { Icon } from "../../../components/icon";
 import { getAnnouncement } from "../../../lib/server-api";
 import { mediaUrl } from "../../../lib/media";
-export const metadata = { title: "Duyuru | Yazılım Atölyesi" };
-export default async function AnnouncementDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+type Props = { params: Promise<{ slug: string }> };
+// Meta veri ve sayfa aynı istekte duyuruyu bir kez okur.
+// Yalnızca backend 404'ü "bulunamadı" (null) sayılır; bağlantı ve sunucu hataları undefined olur.
+const loadAnnouncement = cache((slug: string) => getAnnouncement(slug).catch(() => undefined));
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const item = await loadAnnouncement((await params).slug);
+  if (!item) return { title: "Duyuru | Yazılım Atölyesi" };
+  return {
+    title: `${item.title} | Yazılım Atölyesi`,
+    description: item.summary,
+    openGraph: { title: item.title, description: item.summary, type: "article", publishedTime: item.publishedAt },
+  };
+}
+export default async function AnnouncementDetailPage({ params }: Props) {
   const { slug } = await params;
-  // Yalnızca backend 404'ü "bulunamadı" sayılır; bağlantı ve sunucu hataları ayrı gösterilir.
-  const item = await getAnnouncement(slug).catch(() => undefined);
+  const item = await loadAnnouncement(slug);
   if (item === null) notFound();
   return (
     <>

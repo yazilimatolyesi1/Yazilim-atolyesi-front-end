@@ -133,6 +133,9 @@ export function AnnouncementList() {
           Duyurular yükleniyor…
         </p>
       ) : error ? null : items.length ? (
+        <>
+        {/* Sayfa başlığı h1, kart başlıkları h3; aradaki seviye ekran okuyucu için. */}
+        <h2 className="sr-only">Duyuru listesi</h2>
         <div className="announcement-grid">
           {items.map((item) => (
             <article className="announcement-card" key={item.id}>
@@ -170,6 +173,7 @@ export function AnnouncementList() {
             </article>
           ))}
         </div>
+        </>
       ) : (
         <p className="empty-state" role="status">
           {filtered

@@ -857,6 +857,15 @@ summary:focus-visible,
 .footer-contact p {
   line-height: 1.9;
 }
+/* Panelden gelen iletişim bloğu footer metin ölçeğinde kalır. */
+.footer-contact .managed-block {
+  gap: 4px;
+  margin: 8px 0 0;
+}
+.footer-contact .managed-block h3 {
+  font-size: 14px;
+  color: var(--club-text);
+}
 .footer-message {
   background: none;
   border: 0;

@@ -2,7 +2,7 @@
 
 Tarih: 8 Ekim 2026 · Kapsam: yalnızca frontend (`app/`, `components/`, `lib/`, `public/`, `tests/`). İncelenen sürüm: `main` (`fcff4dc`) + PR #4 düzeltmeleri (`3e3e9f2`).
 
-Kişi görev dosyaları: [01 Tasarım sistemi](01-design-system.md) · [02 Ana sayfa](02-homepage-conversion.md) · [03 Bilgi mimarisi](03-information-architecture.md) · [04 Responsive ve erişilebilirlik](04-responsive-accessibility.md) · [05 Hareket ve performans](05-motion-performance.md) · [Son denetim](FINAL-AUDIT.md)
+Kişi görev dosyaları: [01 Tasarım sistemi](01-design-system.md) · [02 Ana sayfa](02-homepage-conversion.md) · [03 Bilgi mimarisi](03-information-architecture.md) · [04 Responsive ve erişilebilirlik](04-responsive-accessibility.md) · [05 Hareket ve performans](05-motion-performance.md) · [06 Kalite ve test](06-quality-release.md) · [Son denetim](FINAL-AUDIT.md)
 
 Dağıtılacak tek sayfalık PDF sürümleri `pdf/` klasöründe. Markdown dosyası değişirse yeniden üret: `python frontend-team/create_pdfs.py`.
 
@@ -50,9 +50,9 @@ Kategori: üniversite yazılım kulüpleri ve öğrenci geliştirici topluluklar
 
 **P0 — hemen:** ✅ ana sayfa duyuru kartlarından detaya bağlantı · ✅ `/duyurular` başlık sırası (axe) · ✅ `/hero-tasarimlari` için `noindex` ve landmark.
 
-**P1 — yüksek etki:** ✅ detay sayfası meta verisi (başlık, açıklama, OG) · ✅ favicon · ✅ footer iletişim bloğu ve telif yılı · tasarım token'ları (1) · buton durumları (1) · hero değer önerisi ve çağrılar (2) · yer tutucu sosyal ikonlar (2) · Hakkımızda boşluğu (2) · tek duyuru kartı bileşeni (3) · breadcrumb ve ilgili duyurular (3) · sitemap/robots/metadataBase (3) · menüde "Duyurular" → `/duyurular` (4) · kırılma noktalarını sadeleştirme (4) · otomatik axe testi (4) · logo optimizasyonu (5) · Lighthouse ölçümü (5).
+**P1 — yüksek etki:** ✅ detay sayfası meta verisi (başlık, açıklama, OG) · ✅ favicon · ✅ footer iletişim bloğu ve telif yılı · tasarım token'ları (1) · buton durumları (1) · hero değer önerisi ve çağrılar (2) · yer tutucu sosyal ikonlar (2) · Hakkımızda boşluğu (2) · tek duyuru kartı bileşeni (3) · breadcrumb ve ilgili duyurular (3) · sitemap/robots/metadataBase (3) · menüde "Duyurular" → `/duyurular` (4) · kırılma noktalarını sadeleştirme (4) · otomatik axe testi (4) · logo optimizasyonu (5) · Lighthouse ölçümü (5) · CI iş akışı, backend'siz test sunucusu, görsel regresyon testi ve PR şablonu (6).
 
-**P2 — zaman kalırsa:** ana sayfa bölüm sırası ve mobil uzunluk (2) · boş durum çağrısı (2) · global 404'e menü (3) · "Devamını oku" adlarının ayrışması (3) · sonuç sayısı özeti (3) · dokunma hedefleri ve 320 px/200% yakınlaştırma (4) · amaçlı geçişler (5) · sayfaya özgü iskeletler (5) · dialog açılış geçişi (5).
+**P2 — zaman kalırsa:** ana sayfa bölüm sırası ve mobil uzunluk (2) · boş durum çağrısı (2) · global 404'e menü (3) · "Devamını oku" adlarının ayrışması (3) · sonuç sayısı özeti (3) · dokunma hedefleri ve 320 px/200% yakınlaştırma (4) · amaçlı geçişler (5) · sayfaya özgü iskeletler (5) · dialog açılış geçişi (5) · Firefox ve mobil Safari testleri, axe testinin CI'a bağlanması (6).
 
 **P3 — bu sprintte değil:** marka yazı tipi · Tailwind'in kaldırılması · anonim ziyaretçide `users/me` 401 isteği · yönetim paneli tasarımı · `lib/content.ts` içindeki kullanılmayan `announcements` dizisi · etkinlik takvimi görünümü.
 
@@ -69,25 +69,26 @@ Kategori: üniversite yazılım kulüpleri ve öğrenci geliştirici topluluklar
 | `app/loading.tsx`, yeni `loading.tsx` dosyaları, `public/` görselleri, `components/brand.tsx` | Kişi 5 | Kişi 2 |
 | `components/dialog.tsx` | Kişi 4 | Kişi 5 (yalnızca CSS geçişi) |
 | `components/auth-form.tsx`, `components/contact-form.tsx` | Kişi 4 (erişilebilirlik kontrolü) | Kişi 1 |
+| `.github/` (CI, PR şablonu), `playwright.config.ts`, `tests/visual/`, `tests/mock-api/`, `package.json` betikleri | Kişi 6 | Kişi 4 (axe testi), Kişi 5 (Lighthouse) |
 | `components/admin/**`, `app/yonetim/**` | Bu sprintte kimse | — |
 
 ## 5. Bir haftalık takvim
 
-| Gün | Kişi 1 | Kişi 2 | Kişi 3 | Kişi 4 | Kişi 5 |
-| --- | --- | --- | --- | --- | --- |
-| 1 Denetim | Renk/boyut envanteri | İçerik soruları liderlere | Kart/sayfa haritası | Klavye + axe turu | Lighthouse ölçümü |
-| 2 Çekirdek | Token PR'ı (gün sonu merge) | Hero metin seçenekleri | Kart bileşeni PR'ı | Menü bağlantısı | Logo görselleri |
-| 3 Ana iş | Buton/girdi durumları | Sosyal ikon, Hakkımızda | Breadcrumb, ilgili duyurular | Kırılma noktaları | Geçişler |
-| 4 Entegrasyon | Diğer PR'larda token kontrolü | Hero + bölüm sırası | sitemap/robots | axe test dosyası | İskeletler |
-| 5 Cila | Kalan renk kodları | Boş durum, metinler | 404, "Devamını oku" | Dokunma hedefleri | Dialog geçişi |
-| 6 Test | Görsel karşılaştırma | Mobil gözden geçirme | Detay/arama testleri | 320 px, %200 zoom | Lighthouse tekrar |
-| 7 Son kontrol | Token tablosu yorumu | Ekran görüntüleri | Testler | Erişilebilirlik notu | `FINAL-AUDIT.md` güncelleme |
+| Gün | Kişi 1 | Kişi 2 | Kişi 3 | Kişi 4 | Kişi 5 | Kişi 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 Denetim | Renk/boyut envanteri | İçerik soruları liderlere | Kart/sayfa haritası | Klavye + axe turu | Lighthouse ölçümü | Testleri backend'e göre ayırma |
+| 2 Çekirdek | Token PR'ı (gün sonu merge) | Hero metin seçenekleri | Kart bileşeni PR'ı | Menü bağlantısı | Logo görselleri | CI merge (sabah), görsel baseline |
+| 3 Ana iş | Buton/girdi durumları | Sosyal ikon, Hakkımızda | Breadcrumb, ilgili duyurular | Kırılma noktaları | Geçişler | Backend'siz test sunucusu |
+| 4 Entegrasyon | Diğer PR'larda token kontrolü | Hero + bölüm sırası | sitemap/robots | axe test dosyası | İskeletler | PR şablonu, axe'ı CI'a bağlama |
+| 5 Cila | Kalan renk kodları | Boş durum, metinler | 404, "Devamını oku" | Dokunma hedefleri | Dialog geçişi | Firefox / mobil Safari |
+| 6 Test | Görsel karşılaştırma | Mobil gözden geçirme | Detay/arama testleri | 320 px, %200 zoom | Lighthouse tekrar | Tüm PR'larda regresyon turu |
+| 7 Son kontrol | Token tablosu yorumu | Ekran görüntüleri | Testler | Erişilebilirlik notu | `FINAL-AUDIT.md` güncelleme | Test özeti Kişi 5'e |
 
 ## 6. Paralel çalışma kuralları
 
-- **Dallar:** `sprint/k1-tokens`, `sprint/k2-homepage`, `sprint/k3-content`, `sprint/k4-a11y`, `sprint/k5-polish`. Hepsi güncel `main`'den açılır. Küçük PR'lar, her PR'da `npm run typecheck`, `npm run build`, `npx playwright test`.
-- **Birleştirme sırası:** Kişi 1 token PR'ı (2. gün) → Kişi 3 kart bileşeni (2. gün) → Kişi 4 menü (3. gün) → Kişi 2 ana sayfa → Kişi 5 cila. Önce birleşen PR'dan sonra diğerleri `main`'i kendi dalına alır.
-- **Çakışma noktaları:** `app/globals.css` (herkes): yalnızca kendi bölümüne yaz, yeni kuralları ilgili bileşen bloğunun altına ekle, renk/boyut için Kişi 1'in token'larını kullan. `components/sections.tsx`: Kişi 3 kartı 2. gün dışarı alır, sonra dosya Kişi 2'nindir. `components/header.tsx`: yerel `main` checkout'unda commit edilmemiş "Görevlerim" değişikliği var; Kişi 4 başlamadan önce bu değişikliğin merge edilmesini bekler.
+- **Dallar:** `sprint/k1-tokens`, `sprint/k2-homepage`, `sprint/k3-content`, `sprint/k4-a11y`, `sprint/k5-polish`, `sprint/k6-qa`. Hepsi güncel `main`'den açılır. Küçük PR'lar, her PR'da `npm run typecheck`, `npm run build`, `npx playwright test`. CI kurulduktan sonra kırmızı PR merge edilmez; her PR'ı Kişi 6 aynı gün inceler.
+- **Birleştirme sırası:** Kişi 6 CI iş akışı (2. gün sabah) → Kişi 1 token PR'ı (2. gün) → Kişi 3 kart bileşeni (2. gün) → Kişi 4 menü (3. gün) → Kişi 2 ana sayfa → Kişi 5 cila. Önce birleşen PR'dan sonra diğerleri `main`'i kendi dalına alır.
+- **Çakışma noktaları:** `app/globals.css` (herkes): yalnızca kendi bölümüne yaz, yeni kuralları ilgili bileşen bloğunun altına ekle, renk/boyut için Kişi 1'in token'larını kullan. `package.json`: Kişi 4 yalnızca `@axe-core/playwright` ekler, betikleri Kişi 6 ekler. `components/sections.tsx`: Kişi 3 kartı 2. gün dışarı alır, sonra dosya Kişi 2'nindir. `components/header.tsx`: yerel `main` checkout'unda commit edilmemiş "Görevlerim" değişikliği var; Kişi 4 başlamadan önce bu değişikliğin merge edilmesini bekler.
 - Aynı bileşeni iki kişi yeniden tasarlamaz; ihtiyaç varsa sahibine issue/mesajla iletilir.
 
 ## 7. Backend bağımlılıkları

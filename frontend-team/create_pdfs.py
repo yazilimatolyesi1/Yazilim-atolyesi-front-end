@@ -28,6 +28,7 @@ FILES = [
     ("03-information-architecture.md", "Kisi-3-Bilgi-Mimarisi.pdf"),
     ("04-responsive-accessibility.md", "Kisi-4-Responsive-Erisilebilirlik.pdf"),
     ("05-motion-performance.md", "Kisi-5-Hareket-Performans.pdf"),
+    ("06-quality-release.md", "Kisi-6-Kalite-Test.pdf"),
 ]
 
 FONTS = {
@@ -336,7 +337,7 @@ def build(md_name: str, pdf_name: str) -> int:
     frame = Frame(MARGIN, MARGIN + FOOTER_H, width, PAGE_H - 2 * MARGIN - HEADER_H - FOOTER_H,
                   leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
     doc.addPageTemplates([PageTemplate(id="card", frames=[frame], onPage=draw_page)])
-    kicker = Table([[Paragraph(f"{escape(tr_upper(person))} / 5", style["kicker"])]], colWidths=[64])
+    kicker = Table([[Paragraph(f"{escape(tr_upper(person))} / {len(FILES)}", style["kicker"])]], colWidths=[64])
     kicker.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.7, ACTION), ("ROUNDEDCORNERS", [9, 9, 9, 9]),
                                 ("BACKGROUND", (0, 0), (-1, -1), PANEL_DEEP), ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                                 ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),

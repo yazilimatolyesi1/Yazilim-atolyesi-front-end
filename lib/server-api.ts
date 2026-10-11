@@ -25,6 +25,17 @@ export async function getHomeAnnouncements(): Promise<{
   }
 }
 
+/** Yayındaki duyuruyu slug ile okur. Kayıt yoksa null; bağlantı veya sunucu hatasında hata fırlatır. */
+export async function getAnnouncement(slug: string): Promise<Announcement | null> {
+  const response = await fetch(`${apiBase()}/announcements/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(5000),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Announcement unavailable: ${response.status}`);
+  return mapAnnouncement(await response.json());
+}
+
 export async function getPageContents(page: "HOME" | "ABOUT" | "CONTACT"): Promise<ContentRecord[] | null> {
   try {
     const response = await fetch(`${apiBase()}/pages/${page}`, { cache: "no-store", signal: AbortSignal.timeout(5000) });

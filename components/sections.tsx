@@ -7,6 +7,7 @@ import {
   updates,
   type Announcement,
 } from "../lib/content";
+import Link from "next/link";
 import { Brand } from "./brand";
 import { Icon } from "./icon";
 import { Dialog } from "./dialog";
@@ -44,7 +45,15 @@ export function AnnouncementCard({ item }: { item: Announcement }) {
           <span>{item.month}</span>
         </div>
         <div>
-          <h3>{item.title}</h3>
+          <h3>
+            {item.slug ? (
+              <Link href={`/duyurular/${encodeURIComponent(item.slug)}`} className="card-title-link">
+                {item.title}
+              </Link>
+            ) : (
+              item.title
+            )}
+          </h3>
           <p>{item.summary}</p>
         </div>
       </div>
@@ -216,7 +225,7 @@ export async function Footer() {
       <div className="footer-brand">
         <Brand footer />
         <p>
-          © 2025 Yazılım Atölyesi – Gönüllü Yazılım Kulübü.
+          © {new Date().getFullYear()} Yazılım Atölyesi – Gönüllü Yazılım Kulübü.
           <br />
           Tüm hakları saklıdır.
         </p>

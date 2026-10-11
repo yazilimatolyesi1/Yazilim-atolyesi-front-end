@@ -11,6 +11,7 @@ export type Announcement = {
   coverImageUrl?: string;
   coverImageAltText?: string;
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   content?: string;

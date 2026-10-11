@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Header } from "../../components/header";
 import { Footer } from "../../components/sections";
 import { AnnouncementList } from "../../components/announcement-list";
@@ -11,7 +12,10 @@ export default function AnnouncementsPage() {
           ← Ana sayfaya dön
         </a>
         <h1>Duyurular</h1>
-        <AnnouncementList />
+        {/* Liste URL'deki arama/kategori/sayfa bilgisini okur; bu kısım tarayıcıda tamamlanır. */}
+        <Suspense fallback={<p className="form-loading" role="status">Duyurular yükleniyor…</p>}>
+          <AnnouncementList />
+        </Suspense>
       </main>
       <Footer />
     </>

@@ -5,6 +5,7 @@ out/
 .pdf-review/
 .env*
 !.env.example
+.env.local
 .e2e-results/
 *.tsbuildinfo
 docs/kisi-gorevleri/preview-*.png

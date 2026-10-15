@@ -165,7 +165,7 @@ test("iletişim formu gerçek veritabanına yazılır", async ({ page }) => {
   const sent = page.waitForResponse(r => r.url().endsWith("/api/club/contact/messages"));
   await dialog.getByRole("button", { name: "Mesaj gönder", exact: true }).click();
   expect((await sent).status()).toBe(201);
-  await expect(dialog.getByRole("heading", { name: "Mesajın bize ulaştı." })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Mesaj alındı" })).toBeVisible();
   const list = await admin.get(`admin/contact-messages?q=${run}`);
   const data = await list.json();
   for (const item of data.content) messages.push(item.id);
@@ -210,7 +210,7 @@ test("servis kesintisi: form korunur, örnek veri gösterilmez, tekrar denemeyle
   await expect(dialog.getByRole("alert")).toContainText("Sunucuya şu anda ulaşılamıyor.");
   await expect(dialog.getByRole("textbox", { name: "Konu", exact: true })).toHaveValue(`${run}-kesinti`);
   await expect(dialog.getByRole("textbox", { name: "Mesajın", exact: true })).toHaveValue("Bağlantı kesildiğinde bu mesaj formda korunmalıdır.");
-  await expect(dialog.getByRole("heading", { name: "Mesajın bize ulaştı." })).toHaveCount(0);
+  await expect(dialog.getByRole("heading", { name: "Mesaj alındı" })).toHaveCount(0);
 
   // Gercek baglanti hatasi (proxy yanit vermiyor) farkli bir mesaj gosterir.
   await page.unroute("**/api/club/**");
@@ -233,5 +233,5 @@ test("servis kesintisi: form korunur, örnek veri gösterilmez, tekrar denemeyle
   const response = await restored;
   expect(response.status()).toBe(201);
   messages.push((await response.json()).id);
-  await expect(form.getByRole("heading", { name: "Mesajın bize ulaştı." })).toBeVisible();
+  await expect(form.getByRole("heading", { name: "Mesaj alındı" })).toBeVisible();
 });

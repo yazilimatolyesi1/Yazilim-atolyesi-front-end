@@ -1,6 +1,6 @@
+import { backendURLConfig } from "@/lib/backend-config";
+import { generalRateLimiter } from "@/lib/rateLimiter";
 import { NextRequest, NextResponse } from "next/server";
-import { apiBase } from "../../../../lib/server-api";
-
 // Explicit method/path permissions; Spring checks the current user's roles.
 const id = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 const routes: Record<string, RegExp[]> = {
@@ -9,6 +9,8 @@ const routes: Record<string, RegExp[]> = {
     // Duyuru detayı slug ile gelir; UUID değil slug.
     /^announcements\/[^/]+$/,
     /^pages\/(HOME|ABOUT|CONTACT)$/,
+    /^admin\/(members|users|contact-messages)$/,
+    /^users\/me$/,
     new RegExp(`^media/images/${id}$`),
     new RegExp(`^admin/(announcements|contents|settings|contact-messages|members|users)(/${id})?$`),
   ],
@@ -26,7 +28,6 @@ const routes: Record<string, RegExp[]> = {
 const cookieName = "club_session";
 const noCache = { "Cache-Control": "no-store" };
 const fail = (message: string, status: number) => NextResponse.json({ message }, { status, headers: noCache });
-
 async function readBody(req: NextRequest, limit: number) {
   if (Number(req.headers.get("content-length")) > limit) throw new RangeError();
   if (!req.body) return undefined;
@@ -40,10 +41,17 @@ async function readBody(req: NextRequest, limit: number) {
     if (size > limit) { await reader.cancel(); throw new RangeError(); }
     chunks.push(value);
   }
-  return Buffer.concat(chunks);
+  return new Uint8Array(Buffer.concat(chunks));
 }
-
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  const rateLimiter = generalRateLimiter(req);
+  if (!rateLimiter.allowed) {
+    return NextResponse.json({
+      error: rateLimiter.message,
+      retryAfter: rateLimiter.retryAfter
+    },
+      { status: rateLimiter.status });
+  };
   const path = (await ctx.params).path.join("/");
   if (!routes[req.method]?.some(pattern => pattern.test(path))) return fail("İşlem bulunamadı.", 404);
   const siteOrigin = process.env.CLUB_SITE_URL ? new URL(process.env.CLUB_SITE_URL).origin : req.nextUrl.origin;
@@ -68,7 +76,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   }
   try {
     const body = req.method === "GET" ? undefined : await readBody(req, upload ? 6 * 1024 * 1024 : 512 * 1024);
-    const upstream = await fetch(`${apiBase()}/${path}${req.nextUrl.search}`, {
+    const upstream = await fetch(`${backendURLConfig.baseUrl}/${backendURLConfig.apiPrefix}/${path}${req.nextUrl.search}`, {
       method: req.method, headers, body, cache: "no-store", signal: AbortSignal.timeout(10000),
     });
     let response: NextResponse;
